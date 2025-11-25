@@ -1,3 +1,4 @@
+local Config = require("sidekick.config")
 local Context = require("sidekick.cli.context")
 local State = require("sidekick.cli.state")
 local Util = require("sidekick.util")
@@ -80,6 +81,29 @@ function M.select(opts)
       end
     end
   require("sidekick.cli.ui.select").select(opts)
+end
+
+--- Start a new CLI tool session without searching for remote sessions
+---@param opts? {name?: string, focus?: boolean}
+---@overload fun(name: string)
+function M.new(opts)
+  opts = type(opts) == "string" and { name = opts } or opts or {}
+  local name = opts.name or "claude"
+  local tool = Config.get_tool(name)
+  if not tool then
+    Util.error(("Unknown tool: %s"):format(name))
+    return
+  end
+  if vim.fn.executable(tool.cmd[1]) ~= 1 then
+    require("sidekick.cli.ui.select").on_missing(tool)
+    return
+  end
+  local Session = require("sidekick.cli.session")
+  Session.setup() -- ensure backends are registered
+  local session = Session.new({ tool = name })
+  session = Session.attach(session)
+  local state = State.get_state(session)
+  State.attach(state, { show = true, focus = opts.focus })
 end
 
 ---@param opts? sidekick.cli.Show
